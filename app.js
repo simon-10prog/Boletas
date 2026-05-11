@@ -548,19 +548,41 @@ async function apiRequest(action, payload = {}) {
 
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    const cleanup = () => {
-      delete window[callbackName];
+    let settled = false;
+
+    const cleanupScript = () => {
       script.remove();
     };
 
+    const cleanupCallback = () => {
+      window.setTimeout(() => {
+        try {
+          delete window[callbackName];
+        } catch (error) {
+          window[callbackName] = () => {};
+        }
+      }, 60000);
+    };
+
+    const finishWithError = (message) => {
+      if (settled) return;
+      settled = true;
+      cleanupScript();
+      cleanupCallback();
+      reject(new Error(message));
+    };
+
     const timeoutId = window.setTimeout(() => {
-      cleanup();
-      reject(new Error("No fue posible conectar con Apps Script."));
+      finishWithError("No fue posible conectar con Apps Script.");
     }, 300000);
 
     window[callbackName] = (data) => {
       window.clearTimeout(timeoutId);
-      cleanup();
+      cleanupScript();
+      cleanupCallback();
+
+      if (settled) return;
+      settled = true;
 
       if (!data || !data.ok) {
         reject(new Error((data && data.error) || "La operacion fallo."));
@@ -572,8 +594,7 @@ async function apiRequest(action, payload = {}) {
 
     script.onerror = () => {
       window.clearTimeout(timeoutId);
-      cleanup();
-      reject(new Error("No fue posible conectar con Apps Script."));
+      finishWithError("No fue posible conectar con Apps Script.");
     };
 
     script.src = `${APP_CONFIG.appsScriptUrl}?${params.toString()}`;
