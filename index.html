@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#9f3d2d">
+  <title>Rifas Boletas</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PWA de rifas</p>
+        <h1>Rifas y boletas</h1>
+        <p class="subtitle">Base gratuita preparada para Google Sheets + Apps Script.</p>
+      </div>
+      <div class="status-card">
+        <span>Modo actual</span>
+        <strong id="connection-status">Demo local</strong>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="panel">
+        <div class="section-head">
+          <h2>Crear rifa</h2>
+          <span class="pill">00 al 99</span>
+        </div>
+        <form id="raffle-form" class="form">
+          <label>
+            Nombre de la rifa
+            <input id="raffle-name" type="text" placeholder="Ej. Rifa Día de la Madre" required>
+          </label>
+          <label>
+            Premio
+            <input id="raffle-prize" type="text" placeholder="Ej. Mercado de 500.000" required>
+          </label>
+          <label>
+            Fecha del sorteo
+            <input id="raffle-date" type="date" required>
+          </label>
+          <label>
+            Valor de la boleta
+            <input id="raffle-price" type="number" min="0" step="1" placeholder="10000" required>
+          </label>
+          <button type="submit">Crear rifa</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <h2>Resumen general</h2>
+          <button id="toggle-source" type="button" class="secondary">Cambiar fuente</button>
+        </div>
+        <div class="stats">
+          <article>
+            <span>Rifas activas</span>
+            <strong id="active-raffles">0</strong>
+          </article>
+          <article>
+            <span>Boletas vendidas</span>
+            <strong id="sold-tickets">0</strong>
+          </article>
+          <article>
+            <span>Total recaudado</span>
+            <strong id="total-revenue">$0</strong>
+          </article>
+        </div>
+        <label>
+          Buscar rifa
+          <input id="raffle-search" type="text" placeholder="Nombre, premio o código">
+        </label>
+      </section>
+    </main>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Rifas</h2>
+        <p class="muted">Selecciona una rifa para vender o liberar números.</p>
+      </div>
+      <div id="raffles-list" class="raffles-list"></div>
+    </section>
+
+    <section class="panel hidden" id="detail-panel">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow" id="detail-id"></p>
+          <h2 id="detail-name"></h2>
+          <p class="muted" id="detail-meta"></p>
+        </div>
+        <button id="close-detail" type="button" class="secondary">Cerrar detalle</button>
+      </div>
+
+      <div class="detail-grid">
+        <div>
+          <div class="stats compact">
+            <article>
+              <span>Disponibles</span>
+              <strong id="detail-available">0</strong>
+            </article>
+            <article>
+              <span>Vendidas</span>
+              <strong id="detail-sold">0</strong>
+            </article>
+            <article>
+              <span>Recaudado</span>
+              <strong id="detail-revenue">$0</strong>
+            </article>
+          </div>
+
+          <div class="tickets-toolbar">
+            <input id="ticket-search" type="text" placeholder="Buscar número o comprador">
+          </div>
+
+          <div id="tickets-grid" class="tickets-grid"></div>
+        </div>
+
+        <div class="sale-card">
+          <h3>Registrar venta</h3>
+          <form id="sale-form" class="form">
+            <label>
+              Número
+              <select id="ticket-number" required></select>
+            </label>
+            <label>
+              Comprador
+              <input id="buyer-name" type="text" placeholder="Nombre completo" required>
+            </label>
+            <label>
+              Teléfono
+              <input id="buyer-phone" type="text" placeholder="3001234567">
+            </label>
+            <label>
+              Valor pagado
+              <input id="buyer-price" type="number" min="0" step="1" placeholder="10000">
+            </label>
+            <button type="submit">Guardar venta</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <dialog id="ticket-dialog">
+    <div class="dialog-body">
+      <h3 id="dialog-title"></h3>
+      <div id="dialog-content"></div>
+      <div class="dialog-actions">
+        <button id="release-ticket" type="button" class="danger">Liberar número</button>
+        <button id="close-dialog" type="button" class="secondary">Cerrar</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "Rifas Boletas",
+  "short_name": "Rifas",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5eee4",
+  "theme_color": "#9f3d2d",
+  "description": "Aplicacion gratuita para manejar rifas y boletas del 00 al 99."
+}
