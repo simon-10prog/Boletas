@@ -205,8 +205,11 @@ async function handleSellTicket(event) {
       await apiRequest("venderBoleta", payload);
       await refreshSelectedRaffle(raffle.id);
     } catch (error) {
-      window.alert(error.message);
-      return;
+      const recovered = await recoverSoldTicket(payload);
+      if (!recovered) {
+        window.alert(error.message);
+        return;
+      }
     }
   } else {
     const ticket = raffle.tickets.find((item) => item.number === payload.number);
@@ -516,6 +519,40 @@ function setRaffleSubmitState(isSubmitting, message = "") {
   submitButton.disabled = isSubmitting;
   submitButton.textContent = isSubmitting ? "Procesando..." : "Crear rifa";
   elements.raffleStatus.textContent = message;
+}
+
+async function recoverSoldTicket(payload) {
+  const attempts = 12;
+  const delayMs = 3000;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      await wait(delayMs);
+      const result = await apiRequest("obtenerBoletas", { rifaId: payload.rifaId });
+      const tickets = (result.tickets || []).map((ticket) => ({
+        number: ticket.numero,
+        status: ticket.estado,
+        buyer: ticket.comprador || "",
+        phone: ticket.telefono || "",
+        soldAt: ticket.vendido_en || "",
+        amountPaid: Number(ticket.valor_pagado || 0)
+      }));
+      const soldTicket = tickets.find((ticket) => ticket.number === payload.number);
+
+      if (soldTicket && soldTicket.status === "vendido") {
+        const raffle = getSelectedRaffle();
+        if (raffle) {
+          raffle.tickets = tickets;
+          raffle.ticketsLoaded = true;
+        }
+        return true;
+      }
+    } catch (recoveryError) {
+      // Keep polling until the recovery window ends.
+    }
+  }
+
+  return false;
 }
 
 async function recoverCreatedRaffle(payload) {
