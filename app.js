@@ -537,7 +537,7 @@ function wait(ms) {
 
 async function apiRequest(action, payload = {}) {
   const callbackName = `appsScriptCallback_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  const params = new URLSearchParams({ action, ...payload, callback: callbackName });
+  const params = new URLSearchParams({ action, ...payload, callback: callbackName, _ts: Date.now().toString() });
 
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
