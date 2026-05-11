@@ -11,7 +11,8 @@ const state = {
   raffleSearch: "",
   ticketSearch: "",
   activeMode: APP_CONFIG.mode,
-  isCreatingRaffle: false
+  isCreatingRaffle: false,
+  isLoadingSelectedRaffle: false
 };
 
 const elements = {
@@ -85,7 +86,7 @@ async function loadData() {
     try {
       const result = await apiRequest("listarRifas");
       const raffles = result.raffles || [];
-      state.raffles = await Promise.all(raffles.map(hydrateRaffleFromApi));
+      state.raffles = raffles.map(normalizeRaffleFromApi);
       return;
     } catch (error) {
       state.activeMode = "demo";
@@ -132,7 +133,8 @@ function buildRaffle({ id, name, prize, drawDate, ticketPrice }) {
       phone: "",
       soldAt: "",
       amountPaid: 0
-    }))
+    })),
+    ticketsLoaded: true
   };
 }
 
@@ -251,12 +253,25 @@ async function handleReleaseTicket() {
   render();
 }
 
-function openRaffleDetail(raffleId) {
+async function openRaffleDetail(raffleId) {
   state.selectedRaffleId = raffleId;
   state.ticketSearch = "";
   elements.ticketSearch.value = "";
-  renderSelectedRaffle();
   elements.detailPanel.classList.remove("hidden");
+  renderSelectedRaffle();
+
+  const raffle = getSelectedRaffle();
+  if (!raffle || raffle.ticketsLoaded) return;
+
+  state.isLoadingSelectedRaffle = true;
+  try {
+    await refreshSelectedRaffle(raffleId);
+  } catch (error) {
+    window.alert(error.message);
+  } finally {
+    state.isLoadingSelectedRaffle = false;
+    renderSelectedRaffle();
+  }
 }
 
 function closeRaffleDetail() {
@@ -322,6 +337,18 @@ function renderRaffles() {
 function renderSelectedRaffle() {
   const raffle = getSelectedRaffle();
   if (!raffle) return;
+
+  if (state.isLoadingSelectedRaffle) {
+    elements.detailId.textContent = raffle.id;
+    elements.detailName.textContent = raffle.name;
+    elements.detailMeta.textContent = `${raffle.prize} | Sorteo: ${formatDate(raffle.drawDate)} | Valor base: ${formatCurrency(raffle.ticketPrice)}`;
+    elements.detailAvailable.textContent = "...";
+    elements.detailSold.textContent = "...";
+    elements.detailRevenue.textContent = "Cargando...";
+    elements.ticketNumber.innerHTML = "<option selected disabled>Cargando numeros...</option>";
+    elements.ticketsGrid.innerHTML = "<p class='muted'>Cargando boletas...</p>";
+    return;
+  }
 
   const sold = (raffle.tickets || []).filter((ticket) => ticket.status === "vendido");
   const available = (raffle.tickets || []).length - sold.length;
@@ -413,6 +440,21 @@ async function refreshSelectedRaffle(raffleId) {
   state.raffles[index] = await hydrateRaffleFromApi(state.raffles[index]);
 }
 
+function normalizeRaffleFromApi(raffle) {
+  const raffleId = raffle.rifa_id || raffle.id;
+  return {
+    id: raffleId,
+    name: raffle.nombre || raffle.name,
+    prize: raffle.premio || raffle.prize,
+    drawDate: raffle.fecha_sorteo || raffle.drawDate,
+    ticketPrice: Number(raffle.valor_boleta || raffle.ticketPrice || 0),
+    status: raffle.estado || raffle.status || "activa",
+    createdAt: raffle.creada_en || raffle.createdAt || "",
+    tickets: [],
+    ticketsLoaded: false
+  };
+}
+
 async function hydrateRaffleFromApi(raffle) {
   const raffleId = raffle.rifa_id || raffle.id;
   const result = await apiRequest("obtenerBoletas", { rifaId: raffleId });
@@ -426,14 +468,9 @@ async function hydrateRaffleFromApi(raffle) {
   }));
 
   return {
-    id: raffleId,
-    name: raffle.nombre || raffle.name,
-    prize: raffle.premio || raffle.prize,
-    drawDate: raffle.fecha_sorteo || raffle.drawDate,
-    ticketPrice: Number(raffle.valor_boleta || raffle.ticketPrice || 0),
-    status: raffle.estado || raffle.status || "activa",
-    createdAt: raffle.creada_en || raffle.createdAt || "",
-    tickets: normalizedTickets
+    ...normalizeRaffleFromApi(raffle),
+    tickets: normalizedTickets,
+    ticketsLoaded: true
   };
 }
 
@@ -534,7 +571,8 @@ function buildCreatedRaffle(id, payload, extra = {}) {
       phone: "",
       soldAt: "",
       amountPaid: 0
-    }))
+    })),
+    ticketsLoaded: true
   };
 }
 
