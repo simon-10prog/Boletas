@@ -1,7 +1,8 @@
 const APP_CONFIG = {
-  mode: "demo",
-  appsScriptUrl: ""
+  mode: "apps-script",
+  appsScriptUrl: "https://script.google.com/macros/s/AKfycbyBiW7wrLTuLXeX10IvjUwpAYMSuRdMNMvHYyP7HX1Ou8v1NW258ZFjLcU-MqSlvOo3/exec"
 };
+
 
 const STORAGE_KEY = "rifas-multi-demo";
 
