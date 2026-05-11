@@ -2,21 +2,36 @@ const SHEET_RAFFLES = "Rifas";
 const SHEET_TICKETS = "Boletas";
 const SHEET_SALES = "Ventas";
 
-function doPost(e) {
-  const body = JSON.parse(e.postData.contents || "{}");
-  const action = body.action;
+function doGet(e) {
+  const params = e && e.parameter ? e.parameter : {};
+  return handleRequest(params);
+}
 
+function doPost(e) {
   try {
-    let data;
-    if (action === "listarRifas") data = listarRifas();
-    if (action === "crearRifa") data = crearRifa(body);
-    if (action === "obtenerBoletas") data = obtenerBoletas(body.rifaId);
-    if (action === "venderBoleta") data = venderBoleta(body);
-    if (action === "liberarBoleta") data = liberarBoleta(body);
-    return jsonResponse({ ok: true, ...data });
+    const body = JSON.parse((e.postData && e.postData.contents) || "{}");
+    return handleRequest(body);
   } catch (error) {
     return jsonResponse({ ok: false, error: error.message });
   }
+}
+
+function handleRequest(payload) {
+  const action = payload.action;
+  const callback = payload.callback;
+  let data;
+
+  if (action === "listarRifas") data = listarRifas();
+  if (action === "crearRifa") data = crearRifa(payload);
+  if (action === "obtenerBoletas") data = obtenerBoletas(payload.rifaId);
+  if (action === "venderBoleta") data = venderBoleta(payload);
+  if (action === "liberarBoleta") data = liberarBoleta(payload);
+
+  if (!action || !data) {
+    return respond({ ok: false, error: "Accion no valida." }, callback);
+  }
+
+  return respond({ ok: true, ...data }, callback);
 }
 
 function listarRifas() {
@@ -146,6 +161,16 @@ function valuesToObjects(values) {
     });
     return item;
   });
+}
+
+function respond(data, callback) {
+  if (callback) {
+    return ContentService
+      .createTextOutput(callback + "(" + JSON.stringify(data) + ")")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+
+  return jsonResponse(data);
 }
 
 function jsonResponse(data) {
