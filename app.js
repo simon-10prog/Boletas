@@ -151,8 +151,25 @@ async function handleCreateRaffle(event) {
 
   try {
     if (state.activeMode === "apps-script" && APP_CONFIG.appsScriptUrl) {
-      await apiRequest("crearRifa", payload);
-      await loadData();
+      const result = await apiRequest("crearRifa", payload);
+      const raffle = {
+        id: result.rifaId,
+        name: payload.name,
+        prize: payload.prize,
+        drawDate: payload.drawDate,
+        ticketPrice: payload.ticketPrice,
+        status: "activa",
+        createdAt: new Date().toISOString(),
+        tickets: Array.from({ length: 100 }, (_, index) => ({
+          number: index.toString().padStart(2, "0"),
+          status: "libre",
+          buyer: "",
+          phone: "",
+          soldAt: "",
+          amountPaid: 0
+        }))
+      };
+      state.raffles.unshift(raffle);
     } else {
       const raffle = buildRaffle({ id: nextRaffleId(), ...payload });
       state.raffles.unshift(raffle);
