@@ -10,7 +10,8 @@ const state = {
   selectedRaffleId: null,
   raffleSearch: "",
   ticketSearch: "",
-  activeMode: APP_CONFIG.mode
+  activeMode: APP_CONFIG.mode,
+  isCreatingRaffle: false
 };
 
 const elements = {
@@ -136,6 +137,8 @@ function buildRaffle({ id, name, prize, drawDate, ticketPrice }) {
 
 async function handleCreateRaffle(event) {
   event.preventDefault();
+  if (state.isCreatingRaffle) return;
+
   const payload = {
     name: elements.raffleName.value.trim(),
     prize: elements.rafflePrize.value.trim(),
@@ -143,22 +146,27 @@ async function handleCreateRaffle(event) {
     ticketPrice: Number(elements.rafflePrice.value)
   };
 
-  if (state.activeMode === "apps-script" && APP_CONFIG.appsScriptUrl) {
-    try {
+  state.isCreatingRaffle = true;
+  setRaffleSubmitState(true);
+
+  try {
+    if (state.activeMode === "apps-script" && APP_CONFIG.appsScriptUrl) {
       await apiRequest("crearRifa", payload);
       await loadData();
-    } catch (error) {
-      window.alert(error.message);
-      return;
+    } else {
+      const raffle = buildRaffle({ id: nextRaffleId(), ...payload });
+      state.raffles.unshift(raffle);
+      persistDemo();
     }
-  } else {
-    const raffle = buildRaffle({ id: nextRaffleId(), ...payload });
-    state.raffles.unshift(raffle);
-    persistDemo();
-  }
 
-  elements.raffleForm.reset();
-  render();
+    elements.raffleForm.reset();
+    render();
+  } catch (error) {
+    window.alert(error.message);
+  } finally {
+    state.isCreatingRaffle = false;
+    setRaffleSubmitState(false);
+  }
 }
 
 async function handleSellTicket(event) {
@@ -449,6 +457,13 @@ function toggleModeMessage() {
   window.alert(message);
 }
 
+function setRaffleSubmitState(isSubmitting) {
+  const submitButton = elements.raffleForm.querySelector('button[type="submit"]');
+  if (!submitButton) return;
+  submitButton.disabled = isSubmitting;
+  submitButton.textContent = isSubmitting ? "Creando rifa..." : "Crear rifa";
+}
+
 async function apiRequest(action, payload = {}) {
   const callbackName = `appsScriptCallback_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const params = new URLSearchParams({ action, ...payload, callback: callbackName });
@@ -463,7 +478,7 @@ async function apiRequest(action, payload = {}) {
     const timeoutId = window.setTimeout(() => {
       cleanup();
       reject(new Error("No fue posible conectar con Apps Script."));
-    }, 20000);
+    }, 60000);
 
     window[callbackName] = (data) => {
       window.clearTimeout(timeoutId);
