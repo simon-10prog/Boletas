@@ -1,6 +1,6 @@
 const APP_CONFIG = {
-  mode: "demo",
-  appsScriptUrl: ""
+  mode: "apps-script",
+  appsScriptUrl: "https://script.google.com/macros/s/AKfycbwXYNMIczU3pl4-sLdz8TjEvCzySCLx-0f6a4cVApRSQgXCmNmW8zGgzK-wb6TbkHTi/exec"
 };
 
 const STORAGE_KEY = "rifas-multi-demo";
@@ -9,7 +9,8 @@ const state = {
   raffles: [],
   selectedRaffleId: null,
   raffleSearch: "",
-  ticketSearch: ""
+  ticketSearch: "",
+  activeMode: APP_CONFIG.mode
 };
 
 const elements = {
@@ -49,6 +50,7 @@ const elements = {
 
 let selectedTicketNumber = null;
 
+
 initialize();
 
 async function initialize() {
@@ -76,7 +78,7 @@ function bindEvents() {
 }
 
 async function loadData() {
-  if (APP_CONFIG.mode === "apps-script" && APP_CONFIG.appsScriptUrl) {
+  if (state.activeMode === "apps-script" && APP_CONFIG.appsScriptUrl) {
     elements.connectionStatus.textContent = "Apps Script";
     try {
       const result = await apiRequest("listarRifas");
@@ -84,6 +86,7 @@ async function loadData() {
       state.raffles = await Promise.all(raffles.map(hydrateRaffleFromApi));
       return;
     } catch (error) {
+      state.activeMode = "demo";
       elements.connectionStatus.textContent = "Demo local";
       window.alert("No se pudo conectar con Apps Script. La app seguira en modo demo.");
     }
@@ -94,7 +97,7 @@ async function loadData() {
 }
 
 function persistDemo() {
-  if (APP_CONFIG.mode === "demo") {
+  if (state.activeMode === "demo") {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.raffles));
   }
 }
@@ -140,7 +143,7 @@ async function handleCreateRaffle(event) {
     ticketPrice: Number(elements.rafflePrice.value)
   };
 
-  if (APP_CONFIG.mode === "apps-script" && APP_CONFIG.appsScriptUrl) {
+  if (state.activeMode === "apps-script" && APP_CONFIG.appsScriptUrl) {
     try {
       await apiRequest("crearRifa", payload);
       await loadData();
@@ -171,7 +174,7 @@ async function handleSellTicket(event) {
     amountPaid: Number(elements.buyerPrice.value || raffle.ticketPrice || 0)
   };
 
-  if (APP_CONFIG.mode === "apps-script" && APP_CONFIG.appsScriptUrl) {
+  if (state.activeMode === "apps-script" && APP_CONFIG.appsScriptUrl) {
     try {
       await apiRequest("venderBoleta", payload);
       await refreshSelectedRaffle(raffle.id);
@@ -198,7 +201,7 @@ async function handleReleaseTicket() {
   const raffle = getSelectedRaffle();
   if (!raffle || !selectedTicketNumber) return;
 
-  if (APP_CONFIG.mode === "apps-script" && APP_CONFIG.appsScriptUrl) {
+  if (state.activeMode === "apps-script" && APP_CONFIG.appsScriptUrl) {
     try {
       await apiRequest("liberarBoleta", {
         rifaId: raffle.id,
@@ -440,30 +443,51 @@ function todayPlus(days) {
 }
 
 function toggleModeMessage() {
-  const message = APP_CONFIG.mode === "demo"
+  const message = state.activeMode === "demo"
     ? "Cuando pegues la URL de Apps Script en APP_CONFIG.appsScriptUrl, esta app dejara de usar localStorage y empezara a consultar Google Sheets."
     : "La app esta usando Apps Script.";
   window.alert(message);
 }
 
 async function apiRequest(action, payload = {}) {
-  const response = await fetch(APP_CONFIG.appsScriptUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action, ...payload })
+  const callbackName = `appsScriptCallback_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const params = new URLSearchParams({ action, ...payload, callback: callbackName });
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    const cleanup = () => {
+      delete window[callbackName];
+      script.remove();
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("No fue posible conectar con Apps Script."));
+    }, 10000);
+
+    window[callbackName] = (data) => {
+      window.clearTimeout(timeoutId);
+      cleanup();
+
+      if (!data || !data.ok) {
+        reject(new Error((data && data.error) || "La operacion fallo."));
+        return;
+      }
+
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      window.clearTimeout(timeoutId);
+      cleanup();
+      reject(new Error("No fue posible conectar con Apps Script."));
+    };
+
+    script.src = `${APP_CONFIG.appsScriptUrl}?${params.toString()}`;
+    document.body.appendChild(script);
   });
-
-  if (!response.ok) {
-    throw new Error("No fue posible conectar con Apps Script.");
-  }
-
-  const data = await response.json();
-  if (!data.ok) {
-    throw new Error(data.error || "La operacion fallo.");
-  }
-
-  return data;
 }
+
 
 function registerServiceWorker() {
   if ("serviceWorker" in navigator) {
