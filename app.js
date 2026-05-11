@@ -46,7 +46,8 @@ const elements = {
   dialogTitle: document.getElementById("dialog-title"),
   dialogContent: document.getElementById("dialog-content"),
   releaseTicket: document.getElementById("release-ticket"),
-  closeDialog: document.getElementById("close-dialog")
+  closeDialog: document.getElementById("close-dialog"),
+  raffleStatus: document.getElementById("raffle-status")
 };
 
 let selectedTicketNumber = null;
@@ -147,7 +148,7 @@ async function handleCreateRaffle(event) {
   };
 
   state.isCreatingRaffle = true;
-  setRaffleSubmitState(true);
+  setRaffleSubmitState(true, "Procesando rifa. Espera a que se guarde...");
 
   try {
     if (state.activeMode === "apps-script" && APP_CONFIG.appsScriptUrl) {
@@ -161,21 +162,26 @@ async function handleCreateRaffle(event) {
     }
 
     elements.raffleForm.reset();
+    setRaffleSubmitState(false, "Rifa creada correctamente.");
     render();
   } catch (error) {
     if (state.activeMode === "apps-script" && APP_CONFIG.appsScriptUrl) {
+      setRaffleSubmitState(true, "La rifa sigue procesandose. Verificando guardado...");
       const recovered = await recoverCreatedRaffle(payload);
       if (recovered) {
         elements.raffleForm.reset();
+        setRaffleSubmitState(false, "Rifa creada correctamente.");
         render();
         return;
       }
     }
 
-    window.alert(error.message);
+    setRaffleSubmitState(false, "No pudimos confirmar la rifa todavia. Recarga en unos segundos para validar.");
   } finally {
     state.isCreatingRaffle = false;
-    setRaffleSubmitState(false);
+    if (!elements.raffleStatus.textContent) {
+      setRaffleSubmitState(false);
+    }
   }
 }
 
@@ -467,11 +473,12 @@ function toggleModeMessage() {
   window.alert(message);
 }
 
-function setRaffleSubmitState(isSubmitting) {
+function setRaffleSubmitState(isSubmitting, message = "") {
   const submitButton = elements.raffleForm.querySelector('button[type="submit"]');
   if (!submitButton) return;
   submitButton.disabled = isSubmitting;
-  submitButton.textContent = isSubmitting ? "Creando rifa..." : "Crear rifa";
+  submitButton.textContent = isSubmitting ? "Procesando..." : "Crear rifa";
+  elements.raffleStatus.textContent = message;
 }
 
 async function recoverCreatedRaffle(payload) {
