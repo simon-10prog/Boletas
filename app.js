@@ -478,7 +478,7 @@ async function apiRequest(action, payload = {}) {
     const timeoutId = window.setTimeout(() => {
       cleanup();
       reject(new Error("No fue posible conectar con Apps Script."));
-    }, 60000);
+    }, 300000);
 
     window[callbackName] = (data) => {
       window.clearTimeout(timeoutId);
