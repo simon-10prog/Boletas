@@ -49,9 +49,14 @@ function crearRifa(body) {
 
   rafflesSheet.appendRow([rifaId, body.name, body.prize, body.drawDate, body.ticketPrice, "activa", now]);
 
+  const tickets = [];
   for (var i = 0; i < 100; i += 1) {
-    ticketsSheet.appendRow([rifaId, Utilities.formatString("%02d", i), "libre", "", "", "", ""]);
+    tickets.push([rifaId, Utilities.formatString("%02d", i), "libre", "", "", "", ""]);
   }
+
+  ticketsSheet
+    .getRange(ticketsSheet.getLastRow() + 1, 1, tickets.length, tickets[0].length)
+    .setValues(tickets);
 
   return { rifaId: rifaId };
 }
