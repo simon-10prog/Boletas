@@ -179,6 +179,15 @@ async function handleCreateRaffle(event) {
     elements.raffleForm.reset();
     render();
   } catch (error) {
+    if (state.activeMode === "apps-script" && APP_CONFIG.appsScriptUrl) {
+      const recovered = await recoverCreatedRaffle(payload);
+      if (recovered) {
+        elements.raffleForm.reset();
+        render();
+        return;
+      }
+    }
+
     window.alert(error.message);
   } finally {
     state.isCreatingRaffle = false;
@@ -479,6 +488,28 @@ function setRaffleSubmitState(isSubmitting) {
   if (!submitButton) return;
   submitButton.disabled = isSubmitting;
   submitButton.textContent = isSubmitting ? "Creando rifa..." : "Crear rifa";
+}
+
+async function recoverCreatedRaffle(payload) {
+  try {
+    await wait(4000);
+    const result = await apiRequest("listarRifas");
+    const raffles = await Promise.all((result.raffles || []).map(hydrateRaffleFromApi));
+    state.raffles = raffles;
+
+    return raffles.some((raffle) => (
+      raffle.name === payload.name &&
+      raffle.prize === payload.prize &&
+      raffle.drawDate === payload.drawDate &&
+      Number(raffle.ticketPrice) === Number(payload.ticketPrice)
+    ));
+  } catch (recoveryError) {
+    return false;
+  }
+}
+
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 async function apiRequest(action, payload = {}) {
