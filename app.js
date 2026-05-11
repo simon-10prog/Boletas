@@ -200,10 +200,25 @@ async function handleSellTicket(event) {
     amountPaid: Number(elements.buyerPrice.value || raffle.ticketPrice || 0)
   };
 
+  const applyLocalSale = () => {
+    const currentRaffle = getSelectedRaffle();
+    if (!currentRaffle) return false;
+    const ticket = (currentRaffle.tickets || []).find((item) => item.number === payload.number);
+    if (!ticket) return false;
+    ticket.status = "vendido";
+    ticket.buyer = payload.buyer;
+    ticket.phone = payload.phone;
+    ticket.amountPaid = payload.amountPaid;
+    ticket.soldAt = new Date().toISOString();
+    return true;
+  };
+
   if (state.activeMode === "apps-script" && APP_CONFIG.appsScriptUrl) {
     try {
       await apiRequest("venderBoleta", payload);
-      await refreshSelectedRaffle(raffle.id);
+      if (!applyLocalSale()) {
+        await refreshSelectedRaffle(raffle.id);
+      }
     } catch (error) {
       const recovered = await recoverSoldTicket(payload);
       if (!recovered) {
