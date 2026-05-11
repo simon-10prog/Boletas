@@ -152,23 +152,7 @@ async function handleCreateRaffle(event) {
   try {
     if (state.activeMode === "apps-script" && APP_CONFIG.appsScriptUrl) {
       const result = await apiRequest("crearRifa", payload);
-      const raffle = {
-        id: result.rifaId,
-        name: payload.name,
-        prize: payload.prize,
-        drawDate: payload.drawDate,
-        ticketPrice: payload.ticketPrice,
-        status: "activa",
-        createdAt: new Date().toISOString(),
-        tickets: Array.from({ length: 100 }, (_, index) => ({
-          number: index.toString().padStart(2, "0"),
-          status: "libre",
-          buyer: "",
-          phone: "",
-          soldAt: "",
-          amountPaid: 0
-        }))
-      };
+      const raffle = buildCreatedRaffle(result.rifaId, payload);
       state.raffles.unshift(raffle);
     } else {
       const raffle = buildRaffle({ id: nextRaffleId(), ...payload });
@@ -491,21 +475,60 @@ function setRaffleSubmitState(isSubmitting) {
 }
 
 async function recoverCreatedRaffle(payload) {
-  try {
-    await wait(4000);
-    const result = await apiRequest("listarRifas");
-    const raffles = await Promise.all((result.raffles || []).map(hydrateRaffleFromApi));
-    state.raffles = raffles;
+  const attempts = 12;
+  const delayMs = 5000;
 
-    return raffles.some((raffle) => (
-      raffle.name === payload.name &&
-      raffle.prize === payload.prize &&
-      raffle.drawDate === payload.drawDate &&
-      Number(raffle.ticketPrice) === Number(payload.ticketPrice)
-    ));
-  } catch (recoveryError) {
-    return false;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      await wait(delayMs);
+      const result = await apiRequest("listarRifas");
+      const recovered = findMatchingRaffle(result.raffles || [], payload);
+
+      if (recovered) {
+        const raffle = buildCreatedRaffle(recovered.rifa_id || recovered.id, payload, {
+          status: recovered.estado || "activa",
+          createdAt: recovered.creada_en || new Date().toISOString()
+        });
+
+        state.raffles = state.raffles.filter((item) => item.id !== raffle.id);
+        state.raffles.unshift(raffle);
+        return true;
+      }
+    } catch (recoveryError) {
+      // Try again until the polling window ends.
+    }
   }
+
+  return false;
+}
+
+function findMatchingRaffle(raffles, payload) {
+  return raffles.find((raffle) => (
+    (raffle.nombre || raffle.name) === payload.name &&
+    (raffle.premio || raffle.prize) === payload.prize &&
+    (raffle.fecha_sorteo || raffle.drawDate) === payload.drawDate &&
+    Number(raffle.valor_boleta || raffle.ticketPrice || 0) === Number(payload.ticketPrice)
+  )) || null;
+}
+
+function buildCreatedRaffle(id, payload, extra = {}) {
+  return {
+    id,
+    name: payload.name,
+    prize: payload.prize,
+    drawDate: payload.drawDate,
+    ticketPrice: Number(payload.ticketPrice),
+    status: extra.status || "activa",
+    createdAt: extra.createdAt || new Date().toISOString(),
+    tickets: Array.from({ length: 100 }, (_, index) => ({
+      number: index.toString().padStart(2, "0"),
+      status: "libre",
+      buyer: "",
+      phone: "",
+      soldAt: "",
+      amountPaid: 0
+    }))
+  };
 }
 
 function wait(ms) {
